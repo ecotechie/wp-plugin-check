@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+function yes_no {
+  while true
+  do
+    read -r -p "$* [Y/n] " answer
+
+    case $answer in
+      #Return 0, a non failure status.
+      [yY][eE][sS]|[yY]|"")
+      return 0
+      break
+      ;;
+      # Return 101, a non-zero (failure) status.
+      [nN][oO]|[nN])
+      return 101
+      break
+      ;;
+      *)
+      echo "Invalid input..."
+      ;;
+    esac
+  done
+}
+
+function plugin_do {
+  echo
+  wp $site plugin ${1} ${active_plugins[$plugin]} --quiet --skip-plugins &&
+    echo "${1^}d ${plugin_titles[$plugin]}" &&
+    echo &&
+    return 0 ||
+    return 101
+} 
+
+[ ! $# -eq 0 ] && site=$1 || site=''
+
+if ! yes_no "Reagy to get started?"; then
+  echo "Quitting, bye..."
+  exit
+fi
+
+echo
+echo 'Getting active plugin list:'
+echo
+
+#Create array of active plugin slugs
+active_plugins=( $(wp $site plugin list --status=active --field=name --skip-plugins) )
+for plugin in ${!active_plugins[@]};
+do
+  #Get plugin title
+  title=$(wp $site plugin get ${active_plugins[$plugin]} --field=title --skip-plugins)
+  echo $((plugin+1)) - $title
+  #Add active plugin title to array
+  plugin_titles+=(" $title ")
+done
+
+echo
+#Get array of plugin numbers to exclude
+read -p 'Input plugin numbers to exclude, separated by spaces: ' -a plugin_exclude_list
+
+for plugin in ${!active_plugins[@]}; 
+do
+  #Compare plugin_exclude_list numbers to current plugin number
+  if [[ ! " ${plugin_exclude_list[*]} " =~ " $((plugin+1)) " ]]; then
+    echo
+    echo
+    echo "***** ${plugin_titles[$plugin]} / (${active_plugins[$plugin]}) *****"
+    plugin_do "deactivate" &&
+      echo "Refresh your page and test." &&
+      echo
+    if yes_no "Continue to the next plugin?"; then
+      plugin_do "activate"
+    else
+      plugin_do "activate" &&
+        echo "Quitting, bye..." &&
+        exit
+    fi
+  fi
+done
