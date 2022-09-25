@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -e
+set -o pipefail
 
 function yes_no {
   while true
@@ -32,7 +34,26 @@ function plugin_do {
     return 101
 } 
 
-[ ! $# -eq 0 ] && site=$1 || site=''
+#If there is an @alias added, use it.
+if [ $# -eq 0 ]; then
+    site=''
+elif [ $# -eq 1 ]; then
+  site=$1
+  if [ ${site:0:1} == "@" ]; then
+    site="${site:1}"
+  fi
+  if [[ $(wp @$site option get siteurl 2>/dev/null) ]]; then
+    site="@$site"
+  else
+    echo "Argument passed must be a functioning WP-CLI alias!"
+    echo "Exiting..."
+    exit 1
+  fi
+else
+  echo "There can be zero, or one argument!"
+  echo "Exiting..."
+  exit 2
+fi
 
 if ! yes_no "Reagy to get started?"; then
   echo "Quitting, bye..."
